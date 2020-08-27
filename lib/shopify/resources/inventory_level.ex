@@ -31,7 +31,9 @@ defmodule Shopify.InventoryLevel do
 
   ## Parameters
     - session: A `%Shopify.Session{}` struct.
-    - params: Can be inventory_item_ids or location_ids or both.
+    - params: Can be inventory_item_ids or location_ids or both. Can also be
+      `page_info` when pagination is used, in which case the other params aren't
+      allowed since the page info encodes the filters.
 
   ## Examples
       iex> Shopify.session |> Shopify.InventoryLevel.all(%{inventory_item_ids: [123]})
@@ -39,18 +41,22 @@ defmodule Shopify.InventoryLevel do
   """
   @spec all(%Shopify.Session{}, map) ::
           {:ok, Shopify.Response.t()} | {:error, Shopify.Response.t()}
-  def all(session, params)
+  def all(session, params) do
+    # Pagination uses stringy keys whereas previously atom keys were required.
+    # This is to retain previous behaviour with validation.
+    params = Map.new(params, fn {k, v} -> {to_string(k), v} end)
 
-  def all(%Shopify.Session{} = session, %{inventory_item_ids: _} = params),
-    do: do_all(session, params)
+    ["inventory_item_ids", "location_ids", "page_info"]
+    |> Enum.any?(&Map.has_key?(params, &1))
+    |> case do
+      true ->
+        session
+        |> Request.new(all_url(), params, plural_resource())
+        |> Client.get()
 
-  def all(%Shopify.Session{} = session, %{location_ids: _} = params), do: do_all(session, params)
-  def all(%Shopify.Session{}, _params), do: unprocessable_entity(@missing_all_params_msg)
-
-  defp do_all(session, params) do
-    session
-    |> Request.new(all_url(), params, plural_resource())
-    |> Client.get()
+      false ->
+        unprocessable_entity(@missing_all_params_msg)
+    end
   end
 
   @doc """

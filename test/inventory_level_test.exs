@@ -21,7 +21,29 @@ defmodule Shopify.InventoryLevelTest do
     assert fixture == response.data
   end
 
-  test "client responds with error 422 if no location_ids or inventory_item_ids parameter for all/2" do
+  test "client can request all inventory_levels with page_info" do
+    # These param keys and values will be strings since they're parsed from URL
+    # query parameters from the response.
+    params = %{
+      "limit" => "250",
+      "page_info" =>
+        "eyJsb2NhdGlvbl9pZHMiOiI5MDU2ODQ5NzciLCJsYXN0X2lkIjozOTA3Mj" <>
+          "g1NiwibGFzdF92YWx1ZSI6IjM5MDcyODU2IiwiZGlyZWN0aW9uIjoibmV4dCJ9"
+    }
+
+    assert {:ok, response} = Shopify.session() |> InventoryLevel.all(params)
+    assert %Shopify.Response{} = response
+    assert 200 == response.code
+
+    fixture =
+      Fixture.load("../test/fixtures/inventory_levels.json", "inventory_levels", [
+        InventoryLevel.empty_resource()
+      ])
+
+    assert fixture == response.data
+  end
+
+  test "client responds with error 422 if no location_ids or inventory_item_ids or page_info parameter for all/2" do
     {success, %{code: code}} = Shopify.session() |> InventoryLevel.all(%{something_else: "asdf"})
 
     assert success == :error
